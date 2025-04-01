@@ -1,0 +1,148 @@
+// Backend (Node.js + Express + MongoDB)
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+
+const app = express();
+app.use(express.json());
+app.use(cors());
+
+mongoose.connect('mongodb://localhost:27017/store', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
+const productSchema = new mongoose.Schema({
+  name: String,
+  category: String,
+  price: Number,
+  quantity: Number,
+  description: String,
+});
+const buyerSchema = new mongoose.Schema({
+  name: String,
+  email: String,
+  phone: String,
+  address: String,
+});
+
+const Product = mongoose.model('Product', productSchema);
+const Buyer = mongoose.model('Buyer', buyerSchema);
+
+// Add Product
+app.post('/products', async (req, res) => {
+  const product = new Product(req.body);
+  await product.save();
+  res.send(product);
+});
+
+// Get Products
+app.get('/products', async (req, res) => {
+  const products = await Product.find();
+  res.send(products);
+});
+
+// Delete Product
+app.delete('/products/:id', async (req, res) => {
+  await Product.findByIdAndDelete(req.params.id);
+  res.send({ message: 'Product deleted' });
+});
+
+// Add Buyer
+app.post('/buyers', async (req, res) => {
+  const buyer = new Buyer(req.body);
+  await buyer.save();
+  res.send(buyer);
+});
+
+// Get Buyers
+app.get('/buyers', async (req, res) => {
+  const buyers = await Buyer.find();
+  res.send(buyers);
+});
+
+// Delete Buyer
+app.delete('/buyers/:id', async (req, res) => {
+  await Buyer.findByIdAndDelete(req.params.id);
+  res.send({ message: 'Buyer deleted' });
+});
+
+app.listen(5000, () => console.log('Server running on port 5000'));
+
+// Frontend (React + Axios)
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+function App() {
+  const [products, setProducts] = useState([]);
+  const [buyers, setBuyers] = useState([]);
+  const [form, setForm] = useState({ type: 'product', name: '', category: '', price: '', quantity: '', description: '', email: '', phone: '', address: '' });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    const productData = await axios.get('http://localhost:5000/products');
+    setProducts(productData.data);
+    const buyerData = await axios.get('http://localhost:5000/buyers');
+    setBuyers(buyerData.data);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const url = form.type === 'product' ? 'http://localhost:5000/products' : 'http://localhost:5000/buyers';
+    await axios.post(url, form);
+    fetchData();
+  };
+
+  const handleDelete = async (id, type) => {
+    const url = `http://localhost:5000/${type}s/${id}`;
+    await axios.delete(url);
+    fetchData();
+  };
+
+  return (
+    <div>
+      <h1>Manage Products & Buyers</h1>
+      <form onSubmit={handleSubmit}>
+        <select onChange={(e) => setForm({ ...form, type: e.target.value })}>
+          <option value='product'>Product</option>
+          <option value='buyer'>Buyer</option>
+        </select>
+        <input type='text' placeholder='Name' onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        {form.type === 'product' ? (
+          <>
+            <input type='text' placeholder='Category' onChange={(e) => setForm({ ...form, category: e.target.value })} />
+            <input type='number' placeholder='Price' onChange={(e) => setForm({ ...form, price: e.target.value })} />
+            <input type='number' placeholder='Quantity' onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
+            <input type='text' placeholder='Description' onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </>
+        ) : (
+          <>
+            <input type='email' placeholder='Email' onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <input type='text' placeholder='Phone' onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            <input type='text' placeholder='Address' onChange={(e) => setForm({ ...form, address: e.target.value })} />
+          </>
+        )}
+        <button type='submit'>Add</button>
+      </form>
+
+      <h2>Products</h2>
+      <ul>
+        {products.map((p) => (
+          <li key={p._id}>{p.name} <button onClick={() => handleDelete(p._id, 'product')}>Delete</button></li>
+        ))}
+      </ul>
+
+      <h2>Buyers</h2>
+      <ul>
+        {buyers.map((b) => (
+          <li key={b._id}>{b.name} <button onClick={() => handleDelete(b._id, 'buyer')}>Delete</button></li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default App;
